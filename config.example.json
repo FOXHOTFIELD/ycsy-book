@@ -4,6 +4,7 @@
   "web_base": "https://www.ycsypt.com",
   "username": "",
   "password": "",
+  "lab_id": 0,
   "experiments": [],
   "coverage": {
     "days_ahead": 1,

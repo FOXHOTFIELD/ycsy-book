@@ -62,6 +62,7 @@ class Config:
     api_base: str = DEFAULT_API
     web_base: str = DEFAULT_WEB
     experiments: List[int] = field(default_factory=list)
+    lab_id: int = 0
     coverage: Coverage = field(default_factory=Coverage)
     run: RunPolicy = field(default_factory=RunPolicy)
     notify: bool = True
@@ -83,6 +84,7 @@ class Config:
         cfg.coverage = _build(Coverage, data.get("coverage"))
         cfg.run = _build(RunPolicy, data.get("run"))
         cfg.experiments = [int(x) for x in (data.get("experiments") or [])]
+        cfg.lab_id = int(data.get("lab_id") or 0)
         cfg.policy_urls = [str(u) for u in (data.get("policy_urls") or [])]
         cfg.source = str(candidate or "")
 

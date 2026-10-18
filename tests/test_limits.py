@@ -403,3 +403,41 @@ def test_rolling_targets_never_cross_midnight():
     targets = planner.rolling_targets(cov, [exp], 3, dusk)
     assert targets == ["2026-10-18 20:40", "2026-10-18 21:00", "2026-10-18 21:20"]
     assert all(t.startswith("2026-10-18") for t in targets)
+
+# ------------------------------------------------- config-level pinning
+
+def test_config_experiments_pin_the_list(monkeypatch):
+    from ycsy.config import Config as Cfg
+    from ycsy.service import Service
+
+    cfg = Cfg()
+    cfg.experiments = [114]
+    svc = Service(cfg, quiet=True)
+    import tempfile
+    import pathlib
+
+    svc.store.dir = pathlib.Path(tempfile.mkdtemp())
+    monkeypatch.setattr(svc, "override", lambda: {})
+    asked = []
+    monkeypatch.setattr(svc.provider, "experiment",
+                        lambda exp_id: asked.append(exp_id) or make_experiment(id=exp_id))
+    assert [e.id for e in svc.experiments()] == [114]
+    assert asked == [114]
+
+
+def test_config_lab_id_filters_discovery(monkeypatch):
+    from ycsy.config import Config as Cfg
+    from ycsy.service import Service
+
+    cfg = Cfg()
+    cfg.lab_id = 12
+    svc = Service(cfg, quiet=True)
+    import tempfile
+    import pathlib
+
+    svc.store.dir = pathlib.Path(tempfile.mkdtemp())
+    monkeypatch.setattr(svc, "override", lambda: {})
+    monkeypatch.setattr(svc.provider, "experiments",
+                        lambda: [make_experiment(id=1, lab_id=12),
+                                 make_experiment(id=2, lab_id=9)])
+    assert [e.id for e in svc.experiments()] == [1]

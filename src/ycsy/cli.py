@@ -169,9 +169,9 @@ def _survey(service: Service) -> int:
     experiments = service.experiments()
     print("== 实验（%d 个）==" % len(experiments))
     for exp in experiments:
-        print("  #%-5s %-26s 实验室 %-8s %s-%s  每次 %s 分钟  可预约 %s 次"
-              % (exp.id, exp.name[:26], exp.lab_name, exp.lab_start, exp.lab_end,
-                 exp.limit_time, exp.limit_count))
+        print("  #%-5s %-26s 实验室 %s(%s) %s-%s  每次 %s 分钟  可预约 %s 次"
+              % (exp.id, exp.name[:26], exp.lab_name, exp.lab_id,
+                 exp.lab_start, exp.lab_end, exp.limit_time, exp.limit_count))
     return 0
 
 

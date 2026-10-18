@@ -141,7 +141,7 @@ class Service:
 
     def experiments(self) -> List[Experiment]:
         override = self.override()
-        pinned = [int(x) for x in (override.get("experiments") or [])]
+        pinned = [int(x) for x in (override.get("experiments") or [])] or list(self.cfg.experiments)
         if pinned:
             return [self.provider.experiment(exp_id) for exp_id in pinned]
 
@@ -156,6 +156,8 @@ class Service:
             )
 
         lab_id = override.get("lab_id")
+        if lab_id is None and self.cfg.lab_id:
+            lab_id = self.cfg.lab_id
         if lab_id is not None:
             items = [item for item in items if item.lab_id == int(lab_id)]
         return items
