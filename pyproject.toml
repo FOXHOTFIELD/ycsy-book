@@ -38,5 +38,11 @@ where = ["src"]
 line-length = 100
 target-version = "py39"
 
+# Pin the rule set on purpose: newer ruff releases keep widening their defaults,
+# which turned a green build red without a single code change. These cover real
+# errors; the style families (UP/BLE/S/PLW) are judgement calls we skip.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "W6"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
