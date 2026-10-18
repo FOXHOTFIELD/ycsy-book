@@ -441,3 +441,27 @@ def test_config_lab_id_filters_discovery(monkeypatch):
                         lambda: [make_experiment(id=1, lab_id=12),
                                  make_experiment(id=2, lab_id=9)])
     assert [e.id for e in svc.experiments()] == [1]
+
+# ------------------------------------------------------------- console encoding
+
+def test_force_utf8_survives_streams_without_reconfigure(monkeypatch):
+    """A cp1252 console used to crash --help with UnicodeEncodeError."""
+    import io
+    import sys
+
+    from ycsy import cli
+
+    fake = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", fake)
+    monkeypatch.setattr(sys, "stderr", fake)
+    cli._force_utf8()          # must not raise
+
+
+def test_main_reports_version():
+    import pytest
+
+    from ycsy import cli
+
+    with pytest.raises(SystemExit) as exc:      # argparse exits for --version
+        cli.main(["--version"])
+    assert exc.value.code == 0

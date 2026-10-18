@@ -62,7 +62,30 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _force_utf8() -> None:
+    """Make Chinese output survive a non-UTF-8 console.
+
+    A Windows install whose code page is 1252 raises UnicodeEncodeError as soon
+    as help text or a status line is printed, which kills the frozen exe on
+    anybody else's machine.
+    """
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+            ctypes.windll.kernel32.SetConsoleCP(65001)
+        except Exception:
+            pass
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 def main(argv: Optional[List[str]] = None) -> int:
+    _force_utf8()
     args = build_parser().parse_args(argv)
     if not args.command:
         args.command = "tui"
