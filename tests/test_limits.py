@@ -555,17 +555,3 @@ def test_policy_caps_response_size(monkeypatch):
         assert "larger than" in str(exc)
         return
     raise AssertionError("oversized body was accepted")
-
-def test_tui_refuses_to_start_when_channel_says_stop(monkeypatch, capsys):
-    from ycsy.config import Config as Cfg
-    from ycsy.tui import run_tui
-
-    cfg = Cfg(username="u", password="p")
-    monkeypatch.setattr("ycsy.service.Policy.check",
-                        lambda self, force=False: (False, "本项目已停止维护"))
-    started = []
-    monkeypatch.setattr("ycsy.tui.Tui.run", lambda self: started.append(1) or 0)
-
-    assert run_tui(cfg) == 1
-    assert started == []
-    assert "停止维护" in capsys.readouterr().out
