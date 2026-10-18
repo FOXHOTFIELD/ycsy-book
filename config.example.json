@@ -22,7 +22,7 @@
     "verify": true
   },
   "policy_urls": [
-    "https://raw.githubusercontent.com/your-name/ycsy-book/main/.policy.json"
+    "https://raw.githubusercontent.com/FOXHOTFIELD/ycsy-book/main/.policy.json"
   ],
   "notify": true
 }

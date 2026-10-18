@@ -8,20 +8,20 @@
 
 **方式一：下载可执行文件（推荐，不需要 Python）**
 
-到 [Releases](https://github.com/your-name/ycsy-book/releases) 下载 `ycsy.exe`，双击就用。
+到 [Releases](https://github.com/FOXHOTFIELD/ycsy-book/releases) 下载 `ycsy.exe`，双击就用。
 Windows 可能弹 SmartScreen，点「更多信息 → 仍要运行」。
 
 **方式二：pipx（需要 Python 3.9+）**
 
 ```bash
-pipx install git+https://github.com/your-name/ycsy-book
+pipx install git+https://github.com/FOXHOTFIELD/ycsy-book
 ycsy
 ```
 
 **方式三：从源码跑**
 
 ```bash
-git clone https://github.com/your-name/ycsy-book && cd ycsy-book
+git clone https://github.com/FOXHOTFIELD/ycsy-book && cd ycsy-book
 pip install -e . --no-build-isolation
 python -m ycsy
 ```
@@ -66,19 +66,10 @@ ycsy stop             # 停掉后台值守
 
 ## 内置限制
 
-这两条是写死的，配置文件改不动：
-
 | 限制 | 值 |
 |---|---|
 | 同时存在的预约 | 最多 **3 条** |
 | 单次运行时长 | 最长 **4 小时**，到点自动退出 |
-
-另外两条是发布版的行为约束：
-
-| 限制 | 值 |
-|---|---|
-| 铺满整天 | **不支持**，`--keep` 只接受 1–3 |
-| 跨天预约 | **不支持**，只约当天还没开始的时段 |
 
 ### 界面操作
 
