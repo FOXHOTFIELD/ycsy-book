@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ycsy-book"
+version = "0.1.0"
+description = "Unofficial CLI/TUI for booking remote-lab experiment benches"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "ycsy-book contributors" }]
+keywords = ["lab", "booking", "cli", "tui"]
+dependencies = [
+    "requests>=2.28",
+    "platformdirs>=3.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff>=0.4"]
+
+[project.scripts]
+ycsy = "ycsy.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/your-name/ycsy-book"
+Repository = "https://github.com/your-name/ycsy-book"
+Issues = "https://github.com/your-name/ycsy-book/issues"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

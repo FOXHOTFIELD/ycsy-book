@@ -1,0 +1,28 @@
+# state / runtime artifacts
+ycsy.config.json
+config.json
+*.local.json
+.ycsy.*
+last-session.json
+last-va-url.txt
+started-log.json
+*.log
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# editors / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.venv-build/
+*.spec.bak

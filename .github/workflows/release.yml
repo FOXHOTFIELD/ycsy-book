@@ -1,0 +1,40 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: install
+        run: |
+          python -m pip install --upgrade pip
+          pip install . pyinstaller
+
+      - name: freeze
+        run: pyinstaller packaging/ycsy.spec --noconfirm
+
+      - name: smoke test
+        run: |
+          dist/ycsy.exe --version
+          dist/ycsy.exe --help
+
+      - name: attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/ycsy.exe
+          body: |
+            下载 `ycsy.exe` 双击即可运行，不需要安装 Python。
+            首次运行会询问学号和密码，保存在 `%LOCALAPPDATA%\ycsy-book\config.json`。
