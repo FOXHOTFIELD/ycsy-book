@@ -662,8 +662,14 @@ def _mmss(seconds: int) -> str:
 
 
 def run_tui(cfg: Config) -> int:
+    tui = Tui(cfg)
+    # one look at the maintenance channel before the UI takes over the terminal
+    allowed, message = tui.service.policy.check()
+    if not allowed:
+        print(message or "本项目已停止维护")
+        return 1
     try:
-        return Tui(cfg).run()
+        return tui.run()
     except KeyboardInterrupt:
         return 0
 
