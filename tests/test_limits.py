@@ -465,3 +465,93 @@ def test_main_reports_version():
     with pytest.raises(SystemExit) as exc:      # argparse exits for --version
         cli.main(["--version"])
     assert exc.value.code == 0
+
+# --------------------------------------------------- policy network guards
+
+def _fake_headers(**kw):
+    return kw
+
+
+def test_policy_rejects_http_and_unknown_hosts():
+    from ycsy.policy import PolicyUrlError, check_url
+
+    bad = [
+        "http://raw.githubusercontent.com/x/y/main/.policy.json",
+        "https://evil.example/.policy.json",
+        "https://raw.githubusercontent.com.evil.example/p.json",
+        "https://raw.githubusercontent.com:8443/p.json",
+        "https://u:p@raw.githubusercontent.com/p.json",
+    ]
+    for url in bad:
+        try:
+            check_url(url)
+        except PolicyUrlError:
+            continue
+        raise AssertionError("should have been refused: %s" % url)
+
+
+def test_policy_rejects_private_addresses(monkeypatch):
+    import socket
+
+    from ycsy.policy import PolicyUrlError, check_url
+
+    for address in ("127.0.0.1", "10.0.0.7", "169.254.169.254", "::1", "fd00::1"):
+        monkeypatch.setattr(
+            socket,
+            "getaddrinfo",
+            lambda *a, **k: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (address, 443))],
+        )
+        try:
+            check_url("https://raw.githubusercontent.com/x/y/main/.policy.json")
+        except PolicyUrlError as exc:
+            assert "non-public" in str(exc), exc      # the address check, not DNS luck
+            continue
+        raise AssertionError("private address accepted: %s" % address)
+
+
+def test_policy_blocks_redirect_to_other_host(monkeypatch):
+    import requests
+
+    from ycsy import policy
+
+    monkeypatch.setattr(policy, "_resolve_public", lambda host: None)
+    monkeypatch.setattr(policy, "_read_capped", lambda response: b'{"status": "ok"}')
+
+    class Redirect:
+        status_code = 302
+        headers = {"Location": "https://evil.example/.policy.json"}
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(requests, "get", lambda *a, **k: Redirect())
+    try:
+        policy.fetch("https://raw.githubusercontent.com/x/y/main/.policy.json")
+    except policy.PolicyUrlError as exc:
+        assert "allowlist" in str(exc)
+        return
+    raise AssertionError("redirect to another host was followed")
+
+
+def test_policy_caps_response_size(monkeypatch):
+    from ycsy import policy
+
+    class Huge:
+        status_code = 200
+        headers: dict = {}
+
+        def iter_content(self, size):
+            for _ in range(64):
+                yield b"x" * 4096
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(policy.requests, "get", lambda *a, **k: Huge())
+    monkeypatch.setattr(policy, "_resolve_public", lambda host: None)
+    try:
+        policy.fetch("https://raw.githubusercontent.com/x/y/main/.policy.json")
+    except policy.PolicyUrlError as exc:
+        assert "larger than" in str(exc)
+        return
+    raise AssertionError("oversized body was accepted")
