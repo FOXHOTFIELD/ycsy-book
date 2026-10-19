@@ -654,9 +654,9 @@ def test_finished_slots_all_look_past():
     """A used slot that is over must not stay bright - 已过就是已过."""
     from ycsy.tui import cell_style
 
-    assert cell_style({"state": "started", "past": True}) == "grey50 strike dim"
-    assert cell_style({"state": "booked", "past": True}) == "grey50 strike dim"
-    assert cell_style({"state": "past", "past": True}) == "grey50 strike dim"
+    assert cell_style({"state": "started", "past": True}) == "grey58 strike"
+    assert cell_style({"state": "booked", "past": True}) == "grey58 strike"
+    assert cell_style({"state": "past", "past": True}) == "grey58 strike"
 
 
 def test_running_and_future_slots_keep_their_colour():

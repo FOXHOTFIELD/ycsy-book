@@ -57,7 +57,8 @@ def cell_style(cell: dict) -> str:
     the 用/约/过 mark still tells you what happened there.
     """
     if cell.get("past"):
-        return "grey50 strike dim"
+        # no "dim" here: dim + grey50 on a black background is invisible
+        return "grey58 strike"
     return COLORS[cell["state"]]
 
 
