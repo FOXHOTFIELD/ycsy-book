@@ -101,7 +101,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         from .console import enable_vt
         from .tui import run_tui
 
-        enable_vt()          # alt screen needs ANSI processing
+        vt_ok = enable_vt()  # alt screen needs ANSI processing
+        os.environ["YCSY_VT_RESULT"] = "1" if vt_ok else "0"
         return run_tui(cfg)
 
     if args.command == "account":

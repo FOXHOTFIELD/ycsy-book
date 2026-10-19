@@ -113,11 +113,13 @@ class Tui:
 
         clear_home()
         self.console.clear()
+        self._trace("start")
         self.state = self._safe_snapshot()
         expired = False
         with KeyReader() as reader, Live(self._view(), console=self.console,
                                         screen=True, auto_refresh=False) as live:
             live.refresh()
+            self._trace("first")
             while True:
                 # same 4h cap as the watcher: the UI does not outlive it either
                 if self.service.expired:
@@ -143,6 +145,7 @@ class Tui:
                 self.state = self._safe_snapshot()
                 live.update(self._view())
                 live.refresh()
+                self._trace("refresh")
                 self._next_refresh = time.time() + self.refresh_sec
         if expired:
             print("已运行满 %.1f 小时，界面自动退出" % self.cfg.run.max_runtime_hours)
@@ -374,6 +377,29 @@ class Tui:
                 self.message = "值守已启动"
                 return
         self.message = "值守没起来，看日志 %s" % log_file
+
+    def _trace(self, tag: str) -> None:
+        """Append one line of geometry facts when YCSY_TRACE names a file."""
+        path = os.environ.get("YCSY_TRACE")
+        if not path:
+            return
+        try:
+            from .console import window_size
+
+            view = self._view()
+            options = self.console.options
+            lines = self.console.render_lines(view, options, pad=False)
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write("%s tag=%s window=%s console=%s measured=%d budget=%d "
+                         "legacy=%s vt=%s alt=%s\n"
+                         % (dt.datetime.now().strftime("%H:%M:%S"), tag, window_size(),
+                            (self.console.width, self.console.height), len(lines),
+                            self._height(), getattr(self.console, "legacy_windows", "?"),
+                            os.environ.get("YCSY_VT_RESULT", "?"),
+                            getattr(self.console, "is_alt_screen", "?")))
+        except Exception as exc:                 # tracing must never break the UI
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write("trace failed: %s\n" % exc)
 
     def _daemon_args(self) -> List[str]:
         """Build the child command line.

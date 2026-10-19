@@ -269,6 +269,16 @@ def run(verbose: bool = True) -> int:
                 checked += 1
                 failures.extend(check(width, height, charset, art))
     if verbose:
+        try:
+            from .console import window_size
+            from rich.console import Console as _Console
+
+            probe = _Console()
+            rows = window_size()
+            print("console: window_size=%s rich=(%sx%s) is_terminal=%s"
+                  % (rows, probe.width, probe.height, probe.is_terminal))
+        except Exception as exc:                     # never fail the run
+            print("console: probe failed: %s" % exc)
         if failures:
             for item in failures:
                 print("FAIL  " + item)
