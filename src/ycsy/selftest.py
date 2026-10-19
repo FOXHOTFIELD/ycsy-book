@@ -200,8 +200,12 @@ def render(width: int, height: int, charset: str, art: bool,
     # Simulate the Windows failure mode: rich is told the window is taller than
     # it really is, so a frame that trusts console.height spills and scrolls.
     claimed_height = height + 6
+    from . import console as console_mod
+
     real_size = os.get_terminal_size
+    real_window = console_mod.window_size
     os.get_terminal_size = lambda *a, **k: os.terminal_size((width, height))
+    console_mod.window_size = lambda: (width, height)
     sink = _Sink()
     console = Console(file=sink, width=width, height=claimed_height,
                       force_terminal=True, legacy_windows=False,
@@ -217,6 +221,7 @@ def render(width: int, height: int, charset: str, art: bool,
                 sink.parts.clear()
     finally:
         os.get_terminal_size = real_size
+        console_mod.window_size = real_window
     return screen, tui
 
 

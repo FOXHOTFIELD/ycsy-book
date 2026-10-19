@@ -131,3 +131,32 @@ def clear_home() -> bool:
     kernel32.SetConsoleCursorPosition.argtypes = [wintypes.HANDLE, _Coord]
     kernel32.SetConsoleCursorPosition(handle, origin)
     return True
+
+
+class _BufferInfo(ctypes.Structure):
+    _fields_ = [("dwSize", _Coord), ("dwCursorPosition", _Coord),
+                ("wAttributes", ctypes.c_ushort), ("srWindow", ctypes.c_short * 4),
+                ("dwMaximumWindowSize", _Coord)]
+
+
+def window_size():
+    """(columns, rows) of the *visible* console window.
+
+    ``os.get_terminal_size`` can report the screen buffer instead of the window
+    on Windows, which is thousands of rows; trusting it makes the UI draw a
+    frame taller than the window and scroll.
+    """
+    kernel32, handle = _api()
+    if not kernel32:
+        return None
+    from ctypes import wintypes
+
+    kernel32.GetConsoleScreenBufferInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(_BufferInfo)]
+    info = _BufferInfo()
+    if not kernel32.GetConsoleScreenBufferInfo(handle, ctypes.byref(info)):
+        return None
+    left, top = info.srWindow[0], info.srWindow[1]
+    right, bottom = info.srWindow[2], info.srWindow[3]
+    columns = max(1, right - left + 1)
+    rows = max(1, bottom - top + 1)
+    return columns, rows

@@ -541,11 +541,12 @@ class Tui:
         return self._view_main()
 
     def _width(self) -> int:
-        """Width of the console we draw on.
+        """Width of the visible console window (minus one for safety)."""
+        from .console import window_size
 
-        Reading it from ``self.console`` instead of ``shutil`` keeps the layout
-        honest when the two disagree (tests, alternate screens).
-        """
+        size = window_size()
+        if size:
+            return max(40, size[0] - 1)
         try:
             return max(40, self.console.width - 1)
         except (AttributeError, ValueError):
@@ -559,6 +560,11 @@ class Tui:
         is what made a frame spill past the window, scroll, and leave a trail of
         stale title lines.
         """
+        from .console import window_size
+
+        size = window_size()
+        if size:
+            return max(10, size[1])
         sizes = []
         try:
             sizes.append(int(self.console.height))
