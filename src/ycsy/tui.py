@@ -116,37 +116,51 @@ class Tui:
         self._trace("start")
         self.state = self._safe_snapshot()
         expired = False
-        with KeyReader() as reader, Live(self._view(), console=self.console,
-                                        screen=True, auto_refresh=False) as live:
-            live.refresh()
-            self._trace("first")
-            while True:
-                # same 4h cap as the watcher: the UI does not outlive it either
-                if self.service.expired:
-                    expired = True
-                    break
-                key = reader.read(0.15)
-                if key is None:
-                    if time.time() >= self._next_refresh:
-                        self.state = self._safe_snapshot()
-                        live.update(self._view())
-                        live.refresh()
-                        self._next_refresh = time.time() + self.refresh_sec
-                    continue
-                action = self._handle(key)
-                if action == "quit":
-                    break
-                if action == "relogin":
-                    return "relogin"
-                # repaint at once: refreshing the snapshot talks to the API and
-                # takes seconds, and the user should see the action land
-                live.update(self._view())
+
+        # The alternate screen gives us a scroll-free canvas. rich's own
+        # screen=True enters it but leaves the cursor wherever the previous
+        # buffer left it, so the frame starts at the bottom and scrolls the
+        # title out of view; switching ourselves lets us clear right after and
+        # start from (0, 0).
+        alt = bool(getattr(self.console, "is_terminal", False))
+        if alt:
+            self.console.set_alt_screen(True)
+            self.console.clear()
+        try:
+            with KeyReader() as reader, Live(self._view(), console=self.console,
+                                            screen=False, auto_refresh=False) as live:
                 live.refresh()
-                self.state = self._safe_snapshot()
-                live.update(self._view())
-                live.refresh()
-                self._trace("refresh")
-                self._next_refresh = time.time() + self.refresh_sec
+                self._trace("first")
+                while True:
+                    # same 4h cap as the watcher: the UI does not outlive it either
+                    if self.service.expired:
+                        expired = True
+                        break
+                    key = reader.read(0.15)
+                    if key is None:
+                        if time.time() >= self._next_refresh:
+                            self.state = self._safe_snapshot()
+                            live.update(self._view())
+                            live.refresh()
+                            self._next_refresh = time.time() + self.refresh_sec
+                        continue
+                    action = self._handle(key)
+                    if action == "quit":
+                        break
+                    if action == "relogin":
+                        return "relogin"
+                    # repaint at once: refreshing the snapshot talks to the API
+                    # and takes seconds, the user should see the action land
+                    live.update(self._view())
+                    live.refresh()
+                    self.state = self._safe_snapshot()
+                    live.update(self._view())
+                    live.refresh()
+                    self._trace("refresh")
+                    self._next_refresh = time.time() + self.refresh_sec
+        finally:
+            if alt:
+                self.console.set_alt_screen(False)
         if expired:
             print("已运行满 %.1f 小时，界面自动退出" % self.cfg.run.max_runtime_hours)
         return None
