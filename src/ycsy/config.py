@@ -70,6 +70,8 @@ class Config:
     client_process: str = "AR.EXE"
     # Draw the corner mascot; turn off if the font has no block glyphs.
     show_art: bool = True
+    # "auto" / "unicode" / "ascii"; ascii keeps layout identical on any font.
+    charset: str = "auto"
     # Optional maintenance channel. Empty means: never make that request.
     policy_urls: List[str] = field(default_factory=list)
     source: str = ""
@@ -103,6 +105,7 @@ class Config:
         cfg.run = _build(RunPolicy, data.get("run"))
         cfg.experiments = [int(x) for x in (data.get("experiments") or [])]
         cfg.lab_id = int(data.get("lab_id") or 0)
+        cfg.charset = str(data.get("charset") or cfg.charset)
         cfg.policy_urls = [str(u) for u in (data.get("policy_urls") or [])]
         cfg.source = str(candidate or "")
 

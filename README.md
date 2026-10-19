@@ -171,6 +171,26 @@ Linux/macOS 的 `override.json` 在 `~/.local/share/ycsy-book/`；Windows 就在
 ```
 
 
+## 字体兼容
+
+界面里的 `─ ▍ ○ ● · — ↑↓←→` 都属于 East-Asian **ambiguous width** 字符：有的字体画一格，
+有的画两格，有的干脆没有字形——这就是布局在别人电脑上错位、像素画糊掉的原因。
+
+两种字符集：
+
+| 模式 | 内容 | 什么时候用 |
+|---|---|---|
+| `unicode`（默认） | 框线、半方块像素画、箭头，好看 | 字体齐全（Consolas / Sarasa / 现代终端） |
+| `ascii` | 只用 ASCII + 汉字，无像素画 | 老字体、点阵字体、布局必须绝对对齐 |
+
+```json
+{ "charset": "ascii" }
+```
+
+优先级：环境变量 `YCSY_CHARSET` > 配置 `charset` > `auto`（Windows 看控制台代码页，
+类 Unix 看 `LANG` 是否 UTF-8）。`ascii` 模式下每个字符的宽度都是确定的，所以排版在
+任何能显示中文的字体上都一致。
+
 ## 安全设计
 
 - 账号密码只存本地，除平台外不发送给任何地方

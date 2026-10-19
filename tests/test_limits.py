@@ -607,3 +607,43 @@ def test_whale_art_is_colourful_and_compact():
     colours = {str(span.style) for row in rows for span in row.spans}
     assert any("#556ef6" in style for style in colours)      # body blue
     assert any("#18255d" in style for style in colours)      # outline
+
+# ------------------------------------------------------------- glyph sets
+
+def test_ascii_glyphs_contain_only_ascii():
+    """ASCII mode must not depend on any ambiguous-width character."""
+    from ycsy import glyphs
+
+    for field in ("rule", "heading", "off", "on", "dot", "dash", "check", "cross", "range"):
+        value = getattr(glyphs.ASCII, field)
+        assert all(ord(ch) < 128 for ch in value), (field, value)
+    assert glyphs.ASCII.art is False
+
+
+def test_unicode_glyphs_keep_the_fancy_set():
+    from ycsy import glyphs
+
+    assert glyphs.UNICODE.rule == "─"
+    assert glyphs.UNICODE.heading.startswith("▍")
+    assert glyphs.UNICODE.art is True
+
+
+def test_charset_env_wins(monkeypatch):
+    from ycsy import glyphs
+
+    monkeypatch.setenv("YCSY_CHARSET", "ascii")
+    assert glyphs.resolve("unicode").name == "ascii"
+    monkeypatch.setenv("YCSY_CHARSET", "unicode")
+    assert glyphs.resolve("ascii").name == "unicode"
+    monkeypatch.delenv("YCSY_CHARSET")
+    assert glyphs.resolve("ascii").name == "ascii"
+
+
+def test_ascii_mode_hides_the_mascot():
+    from ycsy.config import Config as Cfg
+    from ycsy.tui import Tui
+
+    cfg = Cfg()
+    cfg.charset = "ascii"
+    tui = Tui(cfg)
+    assert tui.g.art is False

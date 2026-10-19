@@ -66,6 +66,9 @@ class Tui:
         self._next_refresh = 0.0
         self._child: Optional[subprocess.Popen] = None
         self.console = Console()
+        from .glyphs import resolve
+
+        self.g = resolve(cfg.charset)
 
     # ---------------------------------------------------------------- loop
     def run(self) -> int:
@@ -178,13 +181,13 @@ class Tui:
             try:
                 self.service.provider.login(user, password)
             except ApiError as exc:
-                console.print(Text.assemble(("  ✗ 登录失败：", "red"), (str(exc), "grey70")))
+                console.print(Text.assemble(("  %s 登录失败：" % self.g.cross, "red"), (str(exc), "grey70")))
                 console.print("")
                 continue
 
             self.service.forget_profile()
             path = self.cfg.save()
-            console.print(Text.assemble(("  ✓ 已保存  ", "green"), (str(path), "grey70")))
+            console.print(Text.assemble(("  %s 已保存  " % self.g.check, "green"), (str(path), "grey70")))
             console.print(Text("  按任意键返回界面", style="grey50"))
             try:
                 with KeyReader() as reader:
@@ -194,7 +197,7 @@ class Tui:
             return True
 
     def _heading(self, title: str) -> Text:
-        return Text.assemble(("▍ ", "cyan"), (title, "bold white"))
+        return Text.assemble((self.g.heading, "cyan"), (title, "bold white"))
 
     def _read_line(self, label: str, password: bool = False) -> Optional[str]:
         """One line of input that understands Esc (cancel) and Backspace.
@@ -227,7 +230,7 @@ class Tui:
 
     def _rule_text(self, console) -> Text:
         width = max(50, min(getattr(console, "width", 80) - 1, 78))
-        return Text("─" * width, style="grey37")
+        return Text(self.g.rule * width, style="grey37")
 
     def _safe_snapshot(self) -> Dict:
         try:
@@ -526,7 +529,7 @@ class Tui:
             return 99
 
     def _rule(self) -> Text:
-        return Text("─" * self._width(), style="grey37")
+        return Text(self.g.rule * self._width(), style="grey37")
 
     def _view_main(self) -> RenderableType:
         state = self.state or {}
@@ -536,7 +539,7 @@ class Tui:
 
         # ▍ 远程实验预约值守   学号 姓名   时间
         head = Text()
-        head.append("▍ ", style="cyan")
+        head.append(self.g.heading, style="cyan")
         head.append("远程实验预约值守", style="bold white")
         who = " ".join(x for x in (user.get("login"), user.get("name")) if x)
         if who:
@@ -547,7 +550,8 @@ class Tui:
 
         pid = self._daemon_pid()
         status = Text()
-        status.append("○ " if not pid else "● ", style="grey50" if not pid else "green")
+        status.append(self.g.off if not pid else self.g.on,
+                      style="grey50" if not pid else "green")
         status.append("未运行" if not pid else "运行中",
                       style="grey50" if not pid else "green")
         status.append("    模式 保持 %d 格" % state.get("keep", 0), style="grey50")
@@ -566,8 +570,9 @@ class Tui:
         pinned_lab = override.get("lab_id") is not None
         labline = Text()
         labline.append("实验室 ", style="grey50")
-        labline.append("%s  %s–%s  (%s min)" % (lab.get("name", ""), lab.get("start", ""),
-                                                lab.get("end", ""), state.get("step", "")),
+        labline.append("%s  %s%s%s  (%s min)" % (lab.get("name", ""), lab.get("start", ""),
+                                                 self.g.range, lab.get("end", ""),
+                                                 state.get("step", "")),
                        style="grey70")
         labline.append("    ")
         labline.append("手动选择" if pinned_lab else "自动选择",
@@ -577,16 +582,17 @@ class Tui:
         upcoming = state.get("next") or {}
         rows = Text()
         rows.append("当前 ", style="grey50")
-        rows.append(_slot(current) or "—", style="cyan")
+        rows.append(_slot(current) or self.g.dash, style="cyan")
         rows.append("      下一 ", style="grey50")
-        rows.append(_slot(upcoming) or "—", style="yellow")
+        rows.append(_slot(upcoming) or self.g.dash, style="yellow")
         rows.append("      剩余 %s / %.1f 小时" % (_mmss(left), self.cfg.run.max_runtime_hours),
                     style="grey50")
 
         grid = self._grid(state.get("cells") or [])
         menu = self._menu()
         # the hint line is permanent; status messages stack underneath it
-        hint = Text("hjkl 或 ↑↓←→ 移动 · 空格/Enter 选择 · m 切换模式 · u 配置账号 · q 退出",
+        hint = Text("hjkl 或 %s 移动 %s 空格/Enter 选择 %s m 切换模式 %s u 配置账号 %s q 退出"
+                    % (self.g.arrows, self.g.dot, self.g.dot, self.g.dot, self.g.dot),
                     style="grey50")
         extra = [Text(self.message, style="yellow")] if self.message else []
         left = Group(hint, *extra)
@@ -597,7 +603,8 @@ class Tui:
         art_rows = self._whale_rows()
         art_width = len(art_rows[0].plain)
         tall_enough = shutil.get_terminal_size((100, 30)).lines >= 26
-        if self.cfg.show_art and tall_enough and self._width() >= art_width + 46:
+        if self.cfg.show_art and self.g.art and tall_enough \
+                and self._width() >= art_width + 46:
             # corner mascot: left column bottom-aligned so the hint sits on the
             # floor of the block, picture hugging the right edge
             footer = Table.grid(padding=(0, 2), expand=True)
@@ -685,7 +692,8 @@ class Tui:
             table.add_row(Text("%s %s 实验#%s 台位 %s" % (box, appointment["time"],
                                                           appointment["experiment"],
                                                           appointment["desk"]), style=style))
-        foot = Text("空格/x 勾选 · a 全选 · Enter 执行 · Esc 返回", style="grey50")
+        foot = Text("空格/x 勾选 %s a 全选 %s Enter 执行 %s Esc 返回"
+                    % (self.g.dot, self.g.dot, self.g.dot), style="grey50")
         picked = len(self.checked)
         return Group(
             self._heading("取消预约"),
@@ -712,7 +720,8 @@ class Tui:
             Text(""),
             table,
             self._rule(),
-            Text("↑↓ 或 j k 选择 · 空格/Enter 确认 · Esc 返回", style="grey50"),
+            Text("%s 或 j k 选择 %s 空格/Enter 确认 %s Esc 返回"
+                 % (self.g.arrows, self.g.dot, self.g.dot), style="grey50"),
         )
 
 
