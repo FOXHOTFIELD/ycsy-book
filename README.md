@@ -211,10 +211,15 @@ Linux/macOS 的 `override.json` 在 `~/.local/share/ycsy-book/`；Windows 就在
 ## 开发
 
 ```bash
-pip install -e ".[dev]"
-pytest
+pip install -e ".[dev]" --no-build-isolation
+pytest                    # 单元 + 离屏界面测试
+ycsy selftest             # 离屏渲染自检：5 种窗口 × 2 种字符集 × 像素画开关
 ruff check src
 ```
+
+界面测试不是"渲染一次看看"：`selftest` 会把真实的 `Live` 对象驱动进一个会滚动的
+VT 模拟器，连续刷新三帧后断言标题只出现一次、画面不超过窗口宽高——"标题越堆越多"
+这类 bug 只有这样才测得出来。CI 和发布产物都会跑它。
 
 结构：`planner.py` 是纯逻辑（无网络、可测试），`providers/` 是平台适配层，
 `service.py` 负责编排，`cli.py` 和 `tui.py` 只是两个前端。

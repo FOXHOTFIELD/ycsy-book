@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import datetime as dt
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -523,10 +522,34 @@ class Tui:
         return self._view_main()
 
     def _width(self) -> int:
+        """Width of the console we draw on.
+
+        Reading it from ``self.console`` instead of ``shutil`` keeps the layout
+        honest when the two disagree (tests, alternate screens).
+        """
         try:
-            return max(60, shutil.get_terminal_size((100, 30)).columns - 1)
-        except OSError:
+            return max(40, self.console.width - 1)
+        except (AttributeError, ValueError):
             return 99
+
+    def _height(self) -> int:
+        """Usable rows: the smaller of what rich thinks and the real window.
+
+        On Windows a legacy console happily reports the *buffer* height (often
+        thousands of rows) while the visible window is 24. Trusting that number
+        is what made a frame spill past the window, scroll, and leave a trail of
+        stale title lines.
+        """
+        sizes = []
+        try:
+            sizes.append(int(self.console.height))
+        except (AttributeError, ValueError):
+            pass
+        try:
+            sizes.append(int(os.get_terminal_size().lines))
+        except OSError:
+            pass
+        return max(10, min(sizes)) if sizes else 30
 
     def _rule(self) -> Text:
         return Text(self.g.rule * self._width(), style="grey37")
@@ -547,6 +570,7 @@ class Tui:
             head.append(who, style="grey70")
         head.append("   ")
         head.append(state.get("now", ""), style="grey50")
+        head.truncate(self._width(), overflow="crop")
 
         pid = self._daemon_pid()
         status = Text()
@@ -577,6 +601,7 @@ class Tui:
         labline.append("    ")
         labline.append("手动选择" if pinned_lab else "自动选择",
                        style="yellow" if pinned_lab else "grey50")
+        labline.truncate(self._width(), overflow="crop")
 
         current = state.get("current") or {}
         upcoming = state.get("next") or {}
@@ -587,6 +612,7 @@ class Tui:
         rows.append(_slot(upcoming) or self.g.dash, style="yellow")
         rows.append("      剩余 %s / %.1f 小时" % (_mmss(left), self.cfg.run.max_runtime_hours),
                     style="grey50")
+        rows.truncate(self._width(), overflow="crop")
 
         grid = self._grid(state.get("cells") or [])
         menu = self._menu()
@@ -594,11 +620,16 @@ class Tui:
         hint = Text("hjkl 或 %s 移动 %s 空格/Enter 选择 %s m 切换模式 %s u 配置账号 %s q 退出"
                     % (self.g.arrows, self.g.dot, self.g.dot, self.g.dot, self.g.dot),
                     style="grey50")
-        extra = [Text(self.message, style="yellow")] if self.message else []
+        hint.truncate(self._width(), overflow="crop")
+        extra = []
+        if self.message:
+            note = Text(self.message, style="yellow")
+            note.truncate(self._width(), overflow="crop")
+            extra.append(note)
         left = Group(hint, *extra)
         cells = state.get("cells") or []
         grid_rows = max(1, (len(cells) + self._per_row() - 1) // self._per_row())
-        term_rows = shutil.get_terminal_size((100, 30)).lines
+        term_rows = self._height()
         budget = max(10, term_rows - 1)        # never fill the very last row
 
         art_rows = self._whale_rows()

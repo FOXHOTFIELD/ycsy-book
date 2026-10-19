@@ -30,6 +30,7 @@ jobs:
         run: |
           dist/ycsy.exe --version
           dist/ycsy.exe --help
+          dist/ycsy.exe selftest
 
       - name: attach to release
         uses: softprops/action-gh-release@v2

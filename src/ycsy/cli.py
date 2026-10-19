@@ -63,6 +63,8 @@ def build_parser() -> argparse.ArgumentParser:
     font = sub.add_parser("font", help="查看或设置控制台字体（仅 Windows）")
     font.add_argument("name", nargs="?", help="要使用的字体名，例如 \"Cascadia Mono\"")
     font.add_argument("--show", action="store_true", help="只显示当前字体")
+
+    sub.add_parser("selftest", help="离屏渲染自检（界面在多种窗口尺寸下是否溢出）")
     return parser
 
 
@@ -105,6 +107,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.command == "font":
         return _font(args, cfg)
+
+    if args.command == "selftest":
+        from . import selftest
+
+        return selftest.run()
 
     service = Service(cfg, dry_run=getattr(args, "dry_run", False))
     try:
