@@ -80,6 +80,22 @@ class Config:
         if candidate:
             with open(candidate, "r", encoding="utf-8") as fh:
                 data = json.load(fh)
+
+        # A config.json sitting next to the executable wins over the user one,
+        # so a leftover template with blank credentials used to hide the real
+        # account and ask for the password on every start. Only for implicit
+        # discovery: an explicit --config is taken literally.
+        if path is None and not str(data.get("username") or "").strip():
+            home = cls.home_config_path()
+            if candidate != home and home.exists():
+                try:
+                    with open(home, "r", encoding="utf-8") as fh:
+                        fallback = json.load(fh)
+                except (OSError, ValueError):
+                    fallback = {}
+                if str(fallback.get("username") or "").strip():
+                    data, candidate = fallback, home
+
         cfg = cls(**{k: v for k, v in _filter(data, cls).items() if k != "source"})
         cfg.coverage = _build(Coverage, data.get("coverage"))
         cfg.run = _build(RunPolicy, data.get("run"))

@@ -59,6 +59,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("state", help="输出 JSON 快照（给界面用）")
     sub.add_parser("stop", help="停掉后台值守进程")
+
+    font = sub.add_parser("font", help="查看或设置控制台字体（仅 Windows）")
+    font.add_argument("name", nargs="?", help="要使用的字体名，例如 \"Cascadia Mono\"")
+    font.add_argument("--show", action="store_true", help="只显示当前字体")
     return parser
 
 
@@ -98,6 +102,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.command == "account":
         return _account(cfg)
+
+    if args.command == "font":
+        return _font(args, cfg)
 
     service = Service(cfg, dry_run=getattr(args, "dry_run", False))
     try:
@@ -157,6 +164,25 @@ def _apply_keep(cfg: Config, args) -> None:
     if clamped != want:
         print("提示：单次最多保持 %d 条，已按 %d 处理" % (MAX_KEEP, clamped))
     cfg.run.keep = clamped
+
+
+def _font(args, cfg: Config) -> int:
+    from . import console
+
+    current = console.font_name()
+    print("当前字体：%s" % (current or "（读不到；Windows Terminal 等伪终端没有字体概念）"))
+    print("")
+    print("推荐字体（支持中英混排，方块字符不会错位）：")
+    for name in console.FONT_CANDIDATES:
+        print("  %s%s" % (name, "   ← 当前" if name == current else ""))
+    print("")
+    print("怎么换：")
+    print("  Windows Terminal：设置 → 配置文件 → 外观 → 字体 → 选上面任意一个")
+    print("                   （没有的话先装：winget install Sarasa.Gothic.Mono 或手动装字体）")
+    print("  旧版控制台：右键标题栏 → 属性 → 字体 → 选 Consolas / Lucida Console")
+    print("")
+    print("程序不会替你改字体：伪终端下系统接口是空操作，改了也只影响当前窗口一次。")
+    return 0
 
 
 def _account(cfg: Config) -> int:

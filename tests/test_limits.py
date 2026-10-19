@@ -591,6 +591,20 @@ def test_grid_columns_adapt_to_width():
     for width in (60, 80, 100, 160):
         tui._width = lambda w=width: w - 1
         widths[width] = narrow(tui)
-    assert widths[60] < widths[80] <= widths[100]
-    assert widths[160] == widths[100]        # capped, never absurdly wide
+    assert widths[60] < widths[80] <= widths[100] <= widths[160]
+    assert widths[160] == 12                 # capped, never absurdly wide
     assert min(widths.values()) >= 3
+
+# ------------------------------------------------------------ corner mascot
+
+def test_whale_art_is_colourful_and_compact():
+    from ycsy.config import Config as Cfg
+    from ycsy.tui import Tui
+
+    picture = Tui(Cfg())._whale()
+    lines = picture.plain.split("\n")
+    assert len(lines) == 8
+    assert len(lines[0]) == 28
+    colours = {str(span.style) for span in picture.spans}
+    assert any("#556ef6" in style for style in colours)      # body blue
+    assert any("#18255d" in style for style in colours)      # outline

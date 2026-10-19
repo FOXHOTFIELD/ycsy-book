@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
+from rich.align import Align
 from rich.console import Console, Group, RenderableType
 from rich.live import Live
 from rich.table import Table
@@ -76,10 +77,9 @@ class Tui:
             try:
                 self.service.login()
             except ApiError as exc:
-                print("登录失败：%s" % exc)
-                if not self._prompt_account(force=True):
-                    return 1
-                continue
+                # credentials are on disk; a failure here is the network or the
+                # token, so land on the main screen and let the user press u
+                self.message = "登录失败：%s（按 u 修改账号）" % exc
             result = self._live_once()
             if result == "relogin":
                 self._prompt_account(force=True)
@@ -143,7 +143,7 @@ class Tui:
         me = self.service.me() or {}
         who = " ".join(x for x in (me.get("userName"), me.get("nickName")) if x) or "（未登录）"
         console.print(Text.assemble(("  配置文件  ", "grey50"),
-                                    (str(Config.home_config_path()), "grey70")))
+                                    (self.cfg.source or str(Config.home_config_path()), "grey70")))
         console.print(Text.assemble(("  当前账号  ", "grey50"), (who, "grey70")))
         console.print(Text.assemble(("  服务器    ", "grey50"), (self.cfg.api_base, "grey70")))
         console.print(rule)
@@ -588,11 +588,22 @@ class Tui:
         # the hint line is permanent; status messages stack underneath it
         hint = Text("hjkl 或 ↑↓←→ 移动 · 空格/Enter 选择 · m 切换模式 · u 配置账号 · q 退出",
                     style="grey50")
+        extra = [Text(self.message, style="yellow")] if self.message else []
+        left = Group(hint, *extra)
         parts = [head, self._rule(), status, labline, rows, self._rule(),
                  Text("今日时段 (%d)" % len(state.get("cells") or []), style="white"),
-                 grid, self._rule(), menu, self._rule(), hint]
-        if self.message:
-            parts.append(Text(self.message, style="yellow"))
+                 grid, self._rule(), menu, self._rule()]
+
+        art_width = len(self._whale().plain.split("\n")[0])
+        if self._width() >= art_width + 46:
+            # corner mascot: left column bottom-aligned so the hint sits on the
+            # floor of the block, picture hugging the right edge
+            footer = Table.grid(padding=(0, 2), expand=True)
+            footer.add_row(Align(left, vertical="bottom"),
+                           Align(self._whale(), align="right", vertical="bottom"))
+            parts.append(footer)
+        else:
+            parts.append(left)
         return Group(*parts)
 
     def _per_row(self) -> int:
@@ -601,7 +612,9 @@ class Tui:
         Each cell is ``HH:MM X`` (7 columns) plus one column of padding, so a
         narrow window drops to fewer columns instead of wrapping ugly.
         """
-        return max(3, min(12, (self._width() - 1) // 8))
+        # one column costs 7 characters plus two of padding; dividing by 8
+        # overflowed and rich wrapped "09:00 过" onto two lines
+        return max(3, min(12, (self._width() - 1) // 9))
 
     def _grid(self, cells: List[dict]) -> Table:
         table = Table.grid(padding=(0, 1))
@@ -631,6 +644,27 @@ class Tui:
                     row.append(Text("  %s" % label, style="white"))
             table.add_row(*row)
         return table
+
+    def _whale(self) -> Text:
+        """The pixel art, drawn with half blocks (two pixels per character cell)."""
+        from . import art
+
+        picture = Text()
+        for index, (top, bottom) in enumerate(zip(art.TOP, art.BOTTOM)):
+            for upper, lower in zip(top, bottom):
+                fg = art.PALETTE[int(upper)] if upper != "0" else None
+                bg = art.PALETTE[int(lower)] if lower != "0" else None
+                if fg is None and bg is None:
+                    picture.append(" ")
+                elif fg is None:
+                    picture.append("▄", style="on " + bg)
+                elif bg is None:
+                    picture.append("▀", style=fg)
+                else:
+                    picture.append("▀", style="%s on %s" % (fg, bg))
+            if index != len(art.TOP) - 1:      # no trailing blank line
+                picture.append("\n")
+        return picture
 
     def _view_cancel(self) -> RenderableType:
         rows = self.state.get("appointments", [])
