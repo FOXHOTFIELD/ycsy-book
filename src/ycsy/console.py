@@ -160,3 +160,26 @@ def window_size():
     columns = max(1, right - left + 1)
     rows = max(1, bottom - top + 1)
     return columns, rows
+
+
+def enable_vt() -> bool:
+    """Turn on ANSI escape processing for this console.
+
+    Without it rich falls back to a legacy renderer that cannot use the
+    alternate screen, so every refresh paints over the same scrollback and the
+    window ends up scrolled with the title out of view.
+    """
+    kernel32, handle = _api()
+    if not kernel32:
+        return False
+    from ctypes import wintypes
+
+    mode = wintypes.DWORD()
+    kernel32.GetConsoleMode.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.SetConsoleMode.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+        return False
+    process_vt, processed_output = 0x0004, 0x0001
+    if mode.value & process_vt:
+        return True
+    return bool(kernel32.SetConsoleMode(handle, mode.value | process_vt | processed_output))

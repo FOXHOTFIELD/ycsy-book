@@ -98,8 +98,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     cfg = Config.load(args.config)
 
     if args.command == "tui":
+        from .console import enable_vt
         from .tui import run_tui
 
+        enable_vt()          # alt screen needs ANSI processing
         return run_tui(cfg)
 
     if args.command == "account":
