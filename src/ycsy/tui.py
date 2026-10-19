@@ -83,10 +83,16 @@ class Tui:
             result = self._live_once()
             if result == "relogin":
                 self._prompt_account(force=True)
+                # the account screen prints above the live view; wipe it so the
+                # main screen does not sit under a pile of leftover lines
+                self.console.clear()
                 continue
             return 0
 
     def _live_once(self) -> Optional[str]:
+        # whatever printed before (account screen, login error) must not stay
+        # above the full-screen view
+        self.console.clear()
         self.state = self._safe_snapshot()
         expired = False
         with KeyReader() as reader, Live(self._view(), screen=True, auto_refresh=False) as live:
@@ -143,6 +149,8 @@ class Tui:
         console.print(rule)
         console.print(Text.assemble(("  留空回车 = 保持原值", "grey37"),
                                     ("    Esc = 不做修改返回", "grey37")))
+        console.print(Text.assemble(("  新账号初始密码 ", "grey37"), ("123456", "grey70"),
+                                    ("（没改过的就是它）", "grey37")))
         console.print("")
 
         while True:
@@ -564,7 +572,7 @@ class Tui:
         rows.append(_slot(current) or "—", style="cyan")
         rows.append("      下一 ", style="grey50")
         rows.append(_slot(upcoming) or "—", style="yellow")
-        rows.append("      运行 %s / %.1f 小时" % (_mmss(left), self.cfg.run.max_runtime_hours),
+        rows.append("      剩余 %s / %.1f 小时" % (_mmss(left), self.cfg.run.max_runtime_hours),
                     style="grey50")
 
         grid = self._grid(state.get("cells") or [])
