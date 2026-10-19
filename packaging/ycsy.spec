@@ -45,5 +45,5 @@ exe = EXE(
     upx=False,
     console=True,           # the TUI needs a real console window
     disable_windowed_traceback=False,
-    icon=None,
+    icon=str(ROOT / "packaging" / "whale.ico"),
 )

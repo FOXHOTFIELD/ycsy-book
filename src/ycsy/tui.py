@@ -596,15 +596,32 @@ class Tui:
                     style="grey50")
         extra = [Text(self.message, style="yellow")] if self.message else []
         left = Group(hint, *extra)
-        parts = [head, self._rule(), status, labline, rows, self._rule(),
-                 Text("今日时段 (%d)" % len(state.get("cells") or []), style="white"),
-                 grid, self._rule(), menu, self._rule()]
+        cells = state.get("cells") or []
+        grid_rows = max(1, (len(cells) + self._per_row() - 1) // self._per_row())
+        term_rows = shutil.get_terminal_size((100, 30)).lines
+        budget = max(10, term_rows - 1)        # never fill the very last row
 
         art_rows = self._whale_rows()
-        art_width = len(art_rows[0].plain)
-        tall_enough = shutil.get_terminal_size((100, 30)).lines >= 26
-        if self.cfg.show_art and self.g.art and tall_enough \
-                and self._width() >= art_width + 46:
+        show_art = bool(self.cfg.show_art and self.g.art)
+        if show_art and self._width() < len(art_rows[0].plain) + 46:
+            show_art = False
+
+        # head, status, lab, current/next, title, menu(3), hint (+4 rules)
+        fixed = 3 + 2 + 1 + 3 + 1 + 4 + grid_rows
+        if show_art and fixed + len(art_rows) > budget:
+            show_art = False
+        show_title = True
+        if not show_art and fixed > budget:
+            # last resort: drop the section title and one rule
+            fixed -= 2
+            show_title = False
+
+        parts = [head, self._rule(), status, labline, rows, self._rule()]
+        if show_title:
+            parts.append(Text("今日时段 (%d)" % len(cells), style="white"))
+        parts += [grid, self._rule(), menu, self._rule()]
+
+        if show_art:
             # corner mascot: left column bottom-aligned so the hint sits on the
             # floor of the block, picture hugging the right edge
             footer = Table.grid(padding=(0, 2), expand=True)

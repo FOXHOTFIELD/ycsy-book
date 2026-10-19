@@ -68,8 +68,8 @@ class Config:
     notify: bool = True
     # Process name of the remote-desktop client, used only by "close client".
     client_process: str = "AR.EXE"
-    # Draw the corner mascot; turn off if the font has no block glyphs.
-    show_art: bool = True
+    # Corner mascot is off by default: block glyphs are font dependent.
+    show_art: bool = False
     # "auto" / "unicode" / "ascii"; ascii keeps layout identical on any font.
     charset: str = "auto"
     # Optional maintenance channel. Empty means: never make that request.
