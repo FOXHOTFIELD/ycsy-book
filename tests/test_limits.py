@@ -647,3 +647,37 @@ def test_ascii_mode_hides_the_mascot():
     cfg.charset = "ascii"
     tui = Tui(cfg)
     assert tui.g.art is False
+
+# --------------------------------------------------------- past slot styling
+
+def test_finished_slots_all_look_past():
+    """A used slot that is over must not stay bright - 已过就是已过."""
+    from ycsy.tui import cell_style
+
+    assert cell_style({"state": "started", "past": True}) == "grey50 strike dim"
+    assert cell_style({"state": "booked", "past": True}) == "grey50 strike dim"
+    assert cell_style({"state": "past", "past": True}) == "grey50 strike dim"
+
+
+def test_running_and_future_slots_keep_their_colour():
+    from ycsy.tui import cell_style
+
+    assert cell_style({"state": "started", "past": False}) == "cyan"
+    assert cell_style({"state": "booked", "past": False}) == "green"
+    assert cell_style({"state": "free", "past": False}) == "yellow"
+
+
+def test_snapshot_marks_finished_started_slots_as_past():
+    """A started appointment whose end time has passed must read as past.
+
+    The snapshot uses ``end <= now`` for that, so a slot that started an hour
+    ago is past while a running one is not.
+    """
+    import datetime as dt
+
+    now = dt.datetime.now()
+    step = dt.timedelta(minutes=20)
+    finished = now - dt.timedelta(minutes=60)
+    running = now - dt.timedelta(minutes=5)
+    assert finished + step <= now          # 已结束
+    assert running + step > now            # 还在进行

@@ -1,3 +1,3 @@
 """ycsy-book: unofficial booking helper for a remote-lab platform."""
 
-__version__ = "0.1.8"
+__version__ = "0.1.9"

@@ -50,6 +50,17 @@ EXIT_OPTIONS = [
 COLORS = {"booked": "green", "started": "cyan", "free": "yellow", "past": "grey50"}
 
 
+def cell_style(cell: dict) -> str:
+    """Colour for one slot.
+
+    Anything that is over reads as past (grey + strike) whatever it used to be;
+    the 用/约/过 mark still tells you what happened there.
+    """
+    if cell.get("past"):
+        return "grey50 strike dim"
+    return COLORS[cell["state"]]
+
+
 class Tui:
     def __init__(self, cfg: Config, refresh_sec: int = 20) -> None:
         self.cfg = cfg
@@ -682,10 +693,7 @@ class Tui:
             for cell in chunk:
                 label = cell["time"][11:16]
                 mark = {"booked": "约", "started": "用", "free": "空", "past": "过"}[cell["state"]]
-                style = COLORS[cell["state"]]
-                if cell.get("past"):
-                    style += " strike"
-                row.append(Text("%s %s" % (label, mark), style=style))
+                row.append(Text("%s %s" % (label, mark), style=cell_style(cell)))
             table.add_row(*row)
         return table
 
