@@ -89,3 +89,45 @@ def font_name() -> Optional[str]:
     if not kernel32.GetCurrentConsoleFontEx(handle, False, ctypes.byref(info)):
         return None
     return info.FaceName or None
+
+
+def clear_home() -> bool:
+    """Blank the console and park the cursor at (0, 0).
+
+    A fresh Windows console sits at the bottom of a tall screen buffer, so the
+    first frame is drawn out of sight and the window shows the tail end of it.
+    """
+    kernel32, handle = _api()
+    if not kernel32:
+        try:
+            print("\x1b[H\x1b[2J", end="", flush=True)
+        except OSError:
+            pass
+        return False
+    from ctypes import wintypes
+
+    class _BufferInfo(ctypes.Structure):
+        _fields_ = [("dwSize", _Coord), ("dwCursorPosition", _Coord),
+                    ("wAttributes", ctypes.c_ushort), ("srWindow", ctypes.c_short * 4),
+                    ("dwMaximumWindowSize", _Coord)]
+
+    class _Rect(ctypes.Structure):
+        _fields_ = [("Left", ctypes.c_short), ("Top", ctypes.c_short),
+                    ("Right", ctypes.c_short), ("Bottom", ctypes.c_short)]
+
+    info = _BufferInfo()
+    kernel32.GetConsoleScreenBufferInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(_BufferInfo)]
+    if not kernel32.GetConsoleScreenBufferInfo(handle, ctypes.byref(info)):
+        return False
+    cells = info.dwSize.X * info.dwSize.Y
+    written = wintypes.DWORD(0)
+    origin = _Coord(0, 0)
+    kernel32.FillConsoleOutputCharacterW.argtypes = [
+        wintypes.HANDLE, wintypes.WCHAR, wintypes.DWORD, _Coord, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.FillConsoleOutputAttribute.argtypes = [
+        wintypes.HANDLE, wintypes.WORD, wintypes.DWORD, _Coord, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.FillConsoleOutputCharacterW(handle, " ", cells, origin, ctypes.byref(written))
+    kernel32.FillConsoleOutputAttribute(handle, info.wAttributes, cells, origin, ctypes.byref(written))
+    kernel32.SetConsoleCursorPosition.argtypes = [wintypes.HANDLE, _Coord]
+    kernel32.SetConsoleCursorPosition(handle, origin)
+    return True

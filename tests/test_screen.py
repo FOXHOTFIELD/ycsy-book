@@ -46,3 +46,17 @@ def test_ascii_mode_never_uses_ambiguous_width_characters():
             if ord(char) < 128 or 0x4E00 <= ord(char) <= 0x9FFF:
                 continue
             assert char in "，。：；、（）【】“”‘’《》…！？·—", (char, line)
+
+def test_grid_never_wraps_a_cell():
+    """Every row of the slot grid must hold whole cells - a wrapped 约 is a bug."""
+    import re
+
+    cell = re.compile(r"\d\d:\d\d [过空约用]")
+    for width, height in ((91, 30), (100, 30), (120, 40), (80, 24)):
+        screen, _ = selftest.render(width, height, "unicode", False, refreshes=1)
+        rows = [len(cell.findall(line)) for line in screen.text()]
+        rows = [count for count in rows if count]
+        assert rows, width
+        full = max(rows)
+        assert rows[:-1] == [full] * (len(rows) - 1), (width, rows)
+        assert sum(rows) == 39, (width, sum(rows))

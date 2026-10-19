@@ -107,7 +107,11 @@ class Tui:
 
     def _live_once(self) -> Optional[str]:
         # whatever printed before (account screen, login error) must not stay
-        # above the full-screen view
+        # above the full-screen view; on Windows the console starts scrolled to
+        # the bottom of its buffer, which used to hide the title line
+        from .console import clear_home
+
+        clear_home()
         self.console.clear()
         self.state = self._safe_snapshot()
         expired = False
@@ -686,7 +690,7 @@ class Tui:
         """
         # one column costs 7 characters plus two of padding; dividing by 8
         # overflowed and rich wrapped "09:00 过" onto two lines
-        return max(3, min(12, (self._width() - 1) // 9))
+        return max(3, min(12, (self._width() - 2) // 9))
 
     def _grid(self, cells: List[dict]) -> Table:
         table = Table.grid(padding=(0, 1))
