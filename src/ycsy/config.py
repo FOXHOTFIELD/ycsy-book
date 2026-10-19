@@ -68,6 +68,8 @@ class Config:
     notify: bool = True
     # Process name of the remote-desktop client, used only by "close client".
     client_process: str = "AR.EXE"
+    # Draw the corner mascot; turn off if the font has no block glyphs.
+    show_art: bool = True
     # Optional maintenance channel. Empty means: never make that request.
     policy_urls: List[str] = field(default_factory=list)
     source: str = ""

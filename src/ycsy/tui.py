@@ -594,13 +594,15 @@ class Tui:
                  Text("今日时段 (%d)" % len(state.get("cells") or []), style="white"),
                  grid, self._rule(), menu, self._rule()]
 
-        art_width = len(self._whale().plain.split("\n")[0])
-        if self._width() >= art_width + 46:
+        art_rows = self._whale_rows()
+        art_width = len(art_rows[0].plain)
+        tall_enough = shutil.get_terminal_size((100, 30)).lines >= 26
+        if self.cfg.show_art and tall_enough and self._width() >= art_width + 46:
             # corner mascot: left column bottom-aligned so the hint sits on the
             # floor of the block, picture hugging the right edge
             footer = Table.grid(padding=(0, 2), expand=True)
             footer.add_row(Align(left, vertical="bottom"),
-                           Align(self._whale(), align="right", vertical="bottom"))
+                           Align(Group(*art_rows), align="right", vertical="bottom"))
             parts.append(footer)
         else:
             parts.append(left)
@@ -645,26 +647,34 @@ class Tui:
             table.add_row(*row)
         return table
 
-    def _whale(self) -> Text:
-        """The pixel art, drawn with half blocks (two pixels per character cell)."""
+    def _whale_rows(self) -> List[Text]:
+        """The pixel art, one Text per line.
+
+        Lines are separate renderables on purpose: a single Text containing
+        "\\n" measures as one line, so Live() mis-counted the frame height and
+        every refresh left another header line on screen.
+        """
         from . import art
 
-        picture = Text()
-        for index, (top, bottom) in enumerate(zip(art.TOP, art.BOTTOM)):
+        rows: List[Text] = []
+        for top, bottom in zip(art.TOP, art.BOTTOM):
+            line = Text()
             for upper, lower in zip(top, bottom):
                 fg = art.PALETTE[int(upper)] if upper != "0" else None
                 bg = art.PALETTE[int(lower)] if lower != "0" else None
                 if fg is None and bg is None:
-                    picture.append(" ")
+                    line.append(" ")
                 elif fg is None:
-                    picture.append("▄", style="on " + bg)
+                    line.append("▄", style="on " + bg)
                 elif bg is None:
-                    picture.append("▀", style=fg)
+                    line.append("▀", style=fg)
                 else:
-                    picture.append("▀", style="%s on %s" % (fg, bg))
-            if index != len(art.TOP) - 1:      # no trailing blank line
-                picture.append("\n")
-        return picture
+                    line.append("▀", style="%s on %s" % (fg, bg))
+            rows.append(line)
+        return rows
+
+    def _whale(self) -> RenderableType:
+        return Group(*self._whale_rows())
 
     def _view_cancel(self) -> RenderableType:
         rows = self.state.get("appointments", [])

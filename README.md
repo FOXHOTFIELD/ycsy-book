@@ -163,6 +163,14 @@ Linux/macOS 的 `override.json` 在 `~/.local/share/ycsy-book/`；Windows 就在
 
 `ycsy font` 会列出现有字体和推荐清单。
 
+右下角的像素画依赖半方块字符 `▀` `▄`。字体缺这几个字形时会显示成乱块，
+在配置里关掉即可：
+
+```json
+{ "show_art": false }
+```
+
+
 ## 安全设计
 
 - 账号密码只存本地，除平台外不发送给任何地方

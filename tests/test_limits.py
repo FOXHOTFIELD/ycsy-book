@@ -601,10 +601,9 @@ def test_whale_art_is_colourful_and_compact():
     from ycsy.config import Config as Cfg
     from ycsy.tui import Tui
 
-    picture = Tui(Cfg())._whale()
-    lines = picture.plain.split("\n")
-    assert len(lines) == 8
-    assert len(lines[0]) == 28
-    colours = {str(span.style) for span in picture.spans}
+    rows = Tui(Cfg())._whale_rows()
+    assert len(rows) == 8
+    assert len(rows[0].plain) == 28
+    colours = {str(span.style) for row in rows for span in row.spans}
     assert any("#556ef6" in style for style in colours)      # body blue
     assert any("#18255d" in style for style in colours)      # outline
