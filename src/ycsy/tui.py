@@ -75,7 +75,9 @@ class Tui:
         self.exit_index = 0
         self._next_refresh = 0.0
         self._child: Optional[subprocess.Popen] = None
-        self.console = Console()
+        # Force colour: the whole screen is colour-coded, and NO_COLOR in the
+        # environment would otherwise turn the UI into an unreadable grey wall.
+        self.console = Console(no_color=False)
         from .glyphs import resolve
 
         self.g = resolve(cfg.charset)
@@ -108,7 +110,8 @@ class Tui:
         self.console.clear()
         self.state = self._safe_snapshot()
         expired = False
-        with KeyReader() as reader, Live(self._view(), screen=True, auto_refresh=False) as live:
+        with KeyReader() as reader, Live(self._view(), console=self.console,
+                                        screen=True, auto_refresh=False) as live:
             live.refresh()
             while True:
                 # same 4h cap as the watcher: the UI does not outlive it either
