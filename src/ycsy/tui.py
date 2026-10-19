@@ -357,10 +357,18 @@ class Tui:
     def _daemon_args(self) -> List[str]:
         """Build the child command line.
 
-        ``--config`` is a *global* option: it has to come before the
-        subcommand, otherwise argparse rejects the whole invocation.
+        Two things bite here:
+
+        * ``--config`` is a *global* option, so it must come before the
+          subcommand or argparse rejects the invocation;
+        * a frozen build has no ``-m ycsy`` - ``sys.executable`` already *is*
+          ycsy.exe, and passing ``-m ycsy`` made the child exit immediately,
+          which looked like "启动值守没反应".
         """
-        args = [sys.executable, "-m", "ycsy"]
+        if getattr(sys, "frozen", False):
+            args = [sys.executable]
+        else:
+            args = [sys.executable, "-m", "ycsy"]
         if self.cfg.source:
             args += ["--config", str(Path(self.cfg.source).resolve())]
         args += ["run", "--go", "--parent-pid", str(os.getpid())]
@@ -587,9 +595,17 @@ class Tui:
             parts.append(Text(self.message, style="yellow"))
         return Group(*parts)
 
+    def _per_row(self) -> int:
+        """How many slot cells fit on one line at the current width.
+
+        Each cell is ``HH:MM X`` (7 columns) plus one column of padding, so a
+        narrow window drops to fewer columns instead of wrapping ugly.
+        """
+        return max(3, min(12, (self._width() - 1) // 8))
+
     def _grid(self, cells: List[dict]) -> Table:
         table = Table.grid(padding=(0, 1))
-        per_row = 8
+        per_row = self._per_row()
         for start in range(0, len(cells), per_row):
             chunk = cells[start:start + per_row]
             row = []

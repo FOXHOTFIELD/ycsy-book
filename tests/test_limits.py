@@ -555,3 +555,42 @@ def test_policy_caps_response_size(monkeypatch):
         assert "larger than" in str(exc)
         return
     raise AssertionError("oversized body was accepted")
+
+# --------------------------------------------------------- frozen launch args
+
+def test_daemon_args_drop_module_flag_when_frozen(monkeypatch):
+    """In a frozen build sys.executable is ycsy.exe, so "-m ycsy" must go."""
+    import sys as _sys
+
+    from ycsy.config import Config as Cfg
+    from ycsy.tui import Tui
+
+    cfg = Cfg()
+    cfg.source = "C:/tmp/config.json"
+    tui = Tui(cfg)
+
+    monkeypatch.setattr(_sys, "frozen", True, raising=False)
+    frozen = tui._daemon_args()
+    assert frozen[0] == _sys.executable
+    assert "-m" not in frozen
+    assert frozen[frozen.index("--config") + 1].endswith("config.json")
+    assert "run" in frozen and "--go" in frozen and "--parent-pid" in frozen
+
+    monkeypatch.delattr(_sys, "frozen", raising=False)
+    source = tui._daemon_args()
+    assert source[:3] == [_sys.executable, "-m", "ycsy"]
+
+
+def test_grid_columns_adapt_to_width():
+    from ycsy.config import Config as Cfg
+    from ycsy.tui import Tui
+
+    tui = Tui(Cfg())
+    narrow = tui.__class__._per_row
+    widths = {}
+    for width in (60, 80, 100, 160):
+        tui._width = lambda w=width: w - 1
+        widths[width] = narrow(tui)
+    assert widths[60] < widths[80] <= widths[100]
+    assert widths[160] == widths[100]        # capped, never absurdly wide
+    assert min(widths.values()) >= 3
