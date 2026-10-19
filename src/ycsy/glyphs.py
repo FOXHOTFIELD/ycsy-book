@@ -28,6 +28,14 @@ from dataclasses import dataclass
 
 MODES = ("auto", "unicode", "ascii")
 
+# One arrow per key, in the order the keys are printed on screen, so the hint
+# reads left-to-right exactly like "h j k l" moves.
+ARROW_FOR_KEY = {"h": "←", "j": "↓", "k": "↑", "l": "→"}
+ARROW_FOR_KEY_ASCII = {"h": "左", "j": "下", "k": "上", "l": "右"}
+
+ARROWS = "".join(ARROW_FOR_KEY[key] for key in "hjkl")
+ARROWS_ASCII = "".join(ARROW_FOR_KEY_ASCII[key] for key in "hjkl")
+
 
 @dataclass(frozen=True)
 class Glyphs:
@@ -53,7 +61,7 @@ UNICODE = Glyphs(
     on="● ",
     dot="·",
     dash="—",
-    arrows="↑↓←→",
+    arrows=ARROWS,
     check="✓",
     cross="✗",
     range="–",
@@ -68,7 +76,7 @@ ASCII = Glyphs(
     on="[*] ",
     dot="|",
     dash="-",
-    arrows="上下左右",
+    arrows=ARROWS_ASCII,
     check="OK",
     cross="X",
     range="-",

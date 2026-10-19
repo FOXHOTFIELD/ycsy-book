@@ -610,13 +610,15 @@ def test_whale_art_is_colourful_and_compact():
 
 # ------------------------------------------------------------- glyph sets
 
-def test_ascii_glyphs_contain_only_ascii():
-    """ASCII mode must not depend on any ambiguous-width character."""
+def test_ascii_glyphs_avoid_ambiguous_width_characters():
+    """ASCII mode may use ASCII or Han, nothing from the ambiguous class."""
     from ycsy import glyphs
 
-    for field in ("rule", "heading", "off", "on", "dot", "dash", "check", "cross", "range"):
+    for field in ("rule", "heading", "off", "on", "dot", "dash", "check", "cross",
+                  "range", "arrows"):
         value = getattr(glyphs.ASCII, field)
-        assert all(ord(ch) < 128 for ch in value), (field, value)
+        for char in value:
+            assert ord(char) < 128 or 0x4E00 <= ord(char) <= 0x9FFF, (field, value)
     assert glyphs.ASCII.art is False
 
 

@@ -830,8 +830,9 @@ class Tui:
             Text(""),
             table,
             self._rule(),
-            Text("%s 或 j k 选择 %s 空格/Enter 确认 %s Esc 返回"
-                 % (self.g.arrows, self.g.dot, self.g.dot), style="grey50"),
+            Text("k j 或 %s%s 选择 %s 空格/Enter 确认 %s Esc 返回"
+                 % (self.g.arrows[2], self.g.arrows[1], self.g.dot, self.g.dot),
+                 style="grey50"),
         )
 
 
