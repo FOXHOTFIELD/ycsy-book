@@ -23,7 +23,7 @@ from typing import Dict, List, Optional, Set
 from . import planner
 from .client import close_remote, open_remote
 from .config import MAX_KEEP, MAX_RUNTIME_HOURS, Config, log_path, state_dir
-from .model import Appointment, Experiment
+from .model import Appointment, Desk, Experiment
 from .policy import Policy
 from .providers import ApiError, RemoteLab
 from .state import FileLock, Store, pid_alive, redact
@@ -233,6 +233,52 @@ class Service:
         if self.cfg.run.auto_start and not self.dry_run:
             booked += self._auto_start(plan)
         return booked
+
+    # ------------------------------------------------------- manual desk pick
+    def desk_options(self) -> Dict:
+        """What the desk picker shows: next slot, its experiment, desks on offer."""
+        plan = self.plan()
+        slot = (plan.pending or plan.slots or [None])[0]
+        if not slot:
+            return {"error": "今天没有可预约的时段了"}
+        experiment = planner.pick_experiment(slot, plan.experiments, plan.used,
+                                             plan.occupied)
+        if experiment is None:
+            return {"error": "这个时段没有可用实验（次数或时间受限）"}
+        try:
+            desks = self.provider.desks(experiment, slot)
+        except ApiError as exc:
+            return {"error": "台位查询失败：%s" % exc}
+        mine = next((row for row in plan.rows.get(experiment.id, []) if row.when == slot),
+                    None)
+        return {"slot": slot, "experiment": experiment, "desks": sorted(
+            desks, key=lambda d: (d.flag != 0, d.name)), "mine": mine}
+
+    def book_desk(self, experiment: Experiment, desk: Desk, slot: str) -> str:
+        """Book one specific desk. Returns a short status line for the UI."""
+        try:
+            self.provider.book(experiment, desk, slot)
+        except ApiError as exc:
+            return "预约失败：%s" % exc
+        if self.cfg.run.verify:
+            rows = self.provider.appointments(experiment)
+            if not any(r.when == slot and r.desk_id == desk.id for r in rows):
+                return "预约后未确认（刷新看看）"
+        self._recent[slot] = time.time()
+        self.log("指定预约 %s 实验#%s 台位 %s" % (slot, experiment.id, desk.name))
+        return "已预约 %s 台位 %s" % (slot[11:16], desk.name)
+
+    def switch_desk(self, appointment: Appointment, experiment: Experiment,
+                    desk: Desk, slot: str) -> str:
+        """Move an existing booking to another desk: cancel, then book the new one."""
+        try:
+            self.provider.cancel(appointment.id)
+        except ApiError as exc:
+            return "取消原预约失败：%s" % exc
+        status = self.book_desk(experiment, desk, slot)
+        if status.startswith("已预约"):
+            return "已换到台位 %s（%s）" % (desk.name, getattr(appointment, "desk_id", "?"))
+        return "原预约已取消，新台位没坐上：%s" % status
 
     def _book(self, experiment: Experiment, slot: str, plan: Plan) -> bool:
         try:

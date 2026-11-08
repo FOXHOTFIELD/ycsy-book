@@ -184,7 +184,7 @@ def sample_state() -> Dict:
 
 
 def render(width: int, height: int, charset: str, art: bool,
-           refreshes: int = 3) -> Tuple[Screen, "Tui"]:      # noqa: F821 - forward ref
+           refreshes: int = 3, view=None) -> Tuple[Screen, "Tui"]:   # noqa: F821
     """Drive the real Live object into a virtual terminal."""
     from .config import Config
     from .tui import Tui
@@ -215,7 +215,7 @@ def render(width: int, height: int, charset: str, art: bool,
         with Live(console=console, auto_refresh=False, screen=False) as live:
             for index in range(refreshes):
                 tui.state["now"] = "2026-10-19 19:20:%02d" % (40 + index)
-                live.update(tui._view())
+                live.update(view if view is not None else tui._view())
                 live.refresh()
                 screen.feed(sink.getvalue())
                 sink.parts.clear()

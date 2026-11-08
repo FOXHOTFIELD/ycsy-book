@@ -60,3 +60,28 @@ def test_grid_never_wraps_a_cell():
         full = max(rows)
         assert rows[:-1] == [full] * (len(rows) - 1), (width, rows)
         assert sum(rows) == 39, (width, sum(rows))
+
+def test_desk_picker_fits_small_windows():
+    """The desk picker is short, but it must still fit and never wrap."""
+    from ycsy.config import Config as Cfg
+    from ycsy.model import Desk, Experiment
+    from ycsy.tui import Tui
+
+    tui = Tui(Cfg())
+    tui.mode = "desk"
+    tui.desk_data = {
+        "slot": "2026-11-08 18:00",
+        "experiment": Experiment(id=206, name="组合电路", limit_count=100, limit_time=20,
+                                 lab_start="09:00", lab_end="22:00"),
+        "desks": [Desk(id=index, name="hdu10-%02d" % index, flag=index % 2)
+                  for index in range(1, 9)],
+        "mine": None,
+    }
+    for width, height in ((80, 24), (60, 20), (120, 40)):
+        screen, _ = selftest.render(width, height, "unicode", False, refreshes=1,
+                                    view=tui._view_desk())
+        lines = [line for line in screen.text() if line.strip()]
+        assert lines, (width, height)
+        assert max(len(line) for line in lines) <= width
+        assert len(lines) <= height
+        assert any("选择台位" in line for line in lines)

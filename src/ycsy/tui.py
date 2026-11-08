@@ -33,6 +33,7 @@ MENU = [
     ("start_daemon", "启动值守"),
     ("stop_daemon", "停止值守"),
     ("start_now", "打开客户端"),
+    ("desk", "选择台位"),
     ("reconnect", "重连客户端"),
     ("cancel", "取消预约"),
     ("refresh", "刷新"),
@@ -72,6 +73,9 @@ class Tui:
         self.mode = "main"
         self.message = ""
         self.checked: Set[int] = set()
+        self.desk_data: Dict = {}
+        self.desk_index = 0
+        self.desk_confirm = False
         self.cancel_index = 0
         self.exit_index = 0
         self._next_refresh = 0.0
@@ -276,6 +280,8 @@ class Tui:
 
     # --------------------------------------------------------------- input
     def _handle(self, key: Key) -> Optional[str]:
+        if self.mode == "desk":
+            return self._handle_desk(key)
         if self.mode == "cancel":
             return self._handle_cancel(key)
         if self.mode == "exit":
@@ -315,6 +321,8 @@ class Tui:
             self._daemon(False)
         elif action == "start_now":
             self._start_now()
+        elif action == "desk":
+            self._open_desk()
         elif action == "reconnect":
             self._reconnect()
         elif action == "cancel":
@@ -494,6 +502,64 @@ class Tui:
         # fallback for a watcher started outside this UI (stale locks are cleaned)
         return live_pid(state_dir() / "daemon.pid")
 
+    # ---------------------------------------------------------------- desk
+    def _open_desk(self) -> None:
+        """Load the desk list for the next slot and open the picker."""
+        self.message = "正在查询台位…"
+        options = self.service.desk_options()
+        if options.get("error"):
+            self.message = options["error"]
+            return
+        self.desk_data = options
+        self.desk_index = 0
+        self.desk_confirm = False
+        self.mode = "desk"
+        self.message = ""
+
+    def _handle_desk(self, key: Key) -> Optional[str]:
+        desks = self.desk_data.get("desks") or []
+        if key.name in ("esc", "q") or not desks:
+            self.mode = "main"
+            self.desk_confirm = False
+            return None
+        if key.name in ("down", "j"):
+            self.desk_index = min(self.desk_index + 1, len(desks) - 1)
+            self.desk_confirm = False
+        elif key.name in ("up", "k"):
+            self.desk_index = max(self.desk_index - 1, 0)
+            self.desk_confirm = False
+        elif key.name == "r":
+            self._open_desk()
+        elif key.name in ("enter", "space"):
+            self._pick_desk(desks[self.desk_index])
+        return None
+
+    def _pick_desk(self, desk) -> None:
+        data = self.desk_data
+        slot = data["slot"]
+        experiment = data["experiment"]
+        mine = data.get("mine")
+        if mine is not None and mine.desk_id == desk.id:
+            self.message = "这一格已经是台位 %s 了" % desk.name
+            return
+        if not desk.is_free:
+            self.message = "台位 %s 被占用了，换一个" % desk.name
+            return
+        if mine is not None:
+            # switching desks destroys the current booking, so ask twice
+            if not self.desk_confirm:
+                self.desk_confirm = True
+                self.message = ("再按一次 Enter 确认：先取消 %s 的当前预约，再抢 %s"
+                                % (slot[11:16], desk.name))
+                return
+            status = self.service.switch_desk(mine, experiment, desk, slot)
+        else:
+            status = self.service.book_desk(experiment, desk, slot)
+        self.message = status
+        self.desk_confirm = False
+        self.mode = "main"
+        self.state = self._safe_snapshot()
+
     # -------------------------------------------------------------- cancel
     def _handle_cancel(self, key: Key) -> Optional[str]:
         rows = self.state.get("appointments", [])
@@ -574,11 +640,58 @@ class Tui:
 
     # ---------------------------------------------------------------- view
     def _view(self) -> RenderableType:
+        if self.mode == "desk":
+            return self._view_desk()
         if self.mode == "cancel":
             return self._view_cancel()
         if self.mode == "exit":
             return self._view_exit()
         return self._view_main()
+
+    def _view_desk(self) -> RenderableType:
+        data = self.desk_data
+        slot = data.get("slot", "")
+        experiment = data.get("experiment")
+        mine = data.get("mine")
+        desks = data.get("desks") or []
+
+        head = Text()
+        head.append("时段 ", style="grey50")
+        head.append("%s–%s" % (slot[11:16], _plus(slot, getattr(experiment, "slot_minutes", 20))),
+                    style="white")
+        head.append("    实验 ", style="grey50")
+        head.append("#%s %s" % (getattr(experiment, "id", "?"),
+                                getattr(experiment, "name", "")[:24]), style="white")
+
+        current = Text("当前 ", style="grey50")
+        if mine is not None:
+            current.append("台位 %s（你的预约）" % mine.desk_id, style="cyan")
+        else:
+            current.append("这一格还没约", style="grey50")
+
+        table = Table.grid(padding=(0, 2))
+        for index, desk in enumerate(desks):
+            if desk.flag == 0:
+                colour = "green" if index != self.desk_index else "reverse"
+                note = "空闲"
+            elif desk.flag == 2:
+                colour = "cyan"
+                note = "我的"
+            else:
+                colour = "grey50"
+                note = "别人占用"
+            marker = "> " if index == self.desk_index else "  "
+            style = colour if colour != "reverse" else "reverse"
+            table.add_row(Text(marker + desk.name, style=style),
+                          Text(note, style="grey50" if desk.flag else "green"))
+
+        foot = Text("j/k 移动 %s Enter 预约/换台位 %s r 刷新 %s Esc 返回"
+                    % (self.g.dot, self.g.dot, self.g.dot), style="grey50")
+        parts = [self._heading("选择台位"), self._rule(), head, current, Text(""),
+                 table, self._rule(), foot]
+        if self.message:
+            parts.append(Text(self.message, style="yellow"))
+        return Group(*parts)
 
     def _width(self) -> int:
         """Width of the visible console window (minus one for safety)."""
@@ -695,27 +808,37 @@ class Tui:
         cells = state.get("cells") or []
         grid_rows = max(1, (len(cells) + self._per_row() - 1) // self._per_row())
         term_rows = self._height()
-        budget = max(10, term_rows - 1)        # never fill the very last row
+        budget = max(10, term_rows - 2)        # keep two spare rows
 
         art_rows = self._whale_rows()
         show_art = bool(self.cfg.show_art and self.g.art)
         if show_art and self._width() < len(art_rows[0].plain) + 46:
             show_art = False
 
-        # head, status, lab, current/next, title, menu(3), hint (+4 rules)
-        fixed = 3 + 2 + 1 + 3 + 1 + 4 + grid_rows
+        # head, status, lab, current/next, title, grid, menu(4 rows now), hint
+        menu_rows = (len(MENU) + 2) // 3
+        fixed = 3 + 1 + 1 + menu_rows + 1 + grid_rows + 4
         if show_art and fixed + len(art_rows) > budget:
             show_art = False
         show_title = True
-        if not show_art and fixed > budget:
-            # last resort: drop the section title and one rule
+        if fixed > budget:
+            # drop the section title and its rule
             fixed -= 2
             show_title = False
+        rules = 4
+        while fixed > budget and rules > 2:
+            # last resort: remove the vertical padding rules
+            rules -= 1
+            fixed -= 1
 
         parts = [head, self._rule(), status, labline, rows, self._rule()]
         if show_title:
             parts.append(Text("今日时段 (%d)" % len(cells), style="white"))
-        parts += [grid, self._rule(), menu, self._rule()]
+        parts.append(grid)
+        parts.append(self._rule())
+        parts.append(menu)
+        if rules >= 4:
+            parts.append(self._rule())
 
         if show_art:
             # corner mascot: left column bottom-aligned so the hint sits on the
@@ -842,6 +965,15 @@ def _slot(cell: dict) -> str:
     desk = cell.get("desk")
     text = cell.get("time", "")[11:16]
     return "%s 台位 %s" % (text, desk) if desk else text
+
+
+def _plus(stamp: str, minutes: int) -> str:
+    """'2026-11-08 18:00' + 20 -> '18:20' (empty string when unparsable)."""
+    try:
+        base = dt.datetime.strptime(stamp, "%Y-%m-%d %H:%M")
+    except ValueError:
+        return ""
+    return (base + dt.timedelta(minutes=minutes)).strftime("%H:%M")
 
 
 def _mmss(seconds: int) -> str:

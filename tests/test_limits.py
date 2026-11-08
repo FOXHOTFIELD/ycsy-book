@@ -683,3 +683,76 @@ def test_snapshot_marks_finished_started_slots_as_past():
     running = now - dt.timedelta(minutes=5)
     assert finished + step <= now          # 已结束
     assert running + step > now            # 还在进行
+
+# ------------------------------------------------------------- desk picker
+
+def _plan_with(slots, experiments):
+    from ycsy.service import Plan
+
+    return Plan(slots=slots, covered=set(), used={}, occupied={},
+                experiments=experiments)
+
+
+def _desk_service(monkeypatch):
+    from ycsy.config import Config as Cfg
+    from ycsy.service import Service
+
+    svc = Service(Cfg(), quiet=True)
+    monkeypatch.setattr(svc, "override", lambda: {})
+    return svc
+
+
+def test_desk_options_reports_when_nothing_is_left(monkeypatch):
+    svc = _desk_service(monkeypatch)
+    exp = make_experiment(id=206)
+    monkeypatch.setattr(svc, "plan", lambda: _plan_with([], [exp]))
+    assert "error" in svc.desk_options()
+
+
+def test_desk_options_lists_free_desks_first(monkeypatch):
+    from ycsy.model import Desk
+
+    svc = _desk_service(monkeypatch)
+    exp = make_experiment(id=206)
+    monkeypatch.setattr(svc, "plan", lambda: _plan_with(["2026-11-08 18:00"], [exp]))
+    monkeypatch.setattr(svc.provider, "desks", lambda e, s: [
+        Desk(id=3, name="hd-03", flag=1),
+        Desk(id=2, name="hd-02", flag=0),
+        Desk(id=1, name="hd-01", flag=0),
+    ])
+    options = svc.desk_options()
+    assert options["slot"] == "2026-11-08 18:00"
+    assert options["experiment"].id == 206
+    assert [d.name for d in options["desks"]][:2] == ["hd-01", "hd-02"]
+    assert options["mine"] is None
+
+
+def test_book_desk_places_the_chosen_one(monkeypatch):
+    from ycsy.model import Appointment, Desk
+
+    svc = _desk_service(monkeypatch)
+    exp = make_experiment(id=206)
+    desk = Desk(id=7, name="hd-07", flag=0)
+    booked = []
+    monkeypatch.setattr(svc.provider, "book", lambda e, d, s: booked.append((e.id, d.id, s)))
+    monkeypatch.setattr(svc.provider, "appointments", lambda e: [
+        Appointment(id=1, experiment_id=206, desk_id=7, when="2026-11-08 18:00")])
+    status = svc.book_desk(exp, desk, "2026-11-08 18:00")
+    assert status.startswith("已预约")
+    assert booked == [(206, 7, "2026-11-08 18:00")]
+
+
+def test_switch_desk_cancels_before_booking(monkeypatch):
+    from ycsy.model import Appointment, Desk
+
+    svc = _desk_service(monkeypatch)
+    exp = make_experiment(id=206)
+    old = Appointment(id=99, experiment_id=206, desk_id=5, when="2026-11-08 18:00")
+    calls = []
+    monkeypatch.setattr(svc.provider, "cancel", lambda i: calls.append(("cancel", i)))
+    monkeypatch.setattr(svc.provider, "book", lambda e, d, s: calls.append(("book", d.id)))
+    monkeypatch.setattr(svc.provider, "appointments", lambda e: [
+        Appointment(id=100, experiment_id=206, desk_id=8, when="2026-11-08 18:00")])
+    status = svc.switch_desk(old, exp, Desk(id=8, name="hd-08", flag=0), "2026-11-08 18:00")
+    assert calls == [("cancel", 99), ("book", 8)]
+    assert status.startswith("已换到台位")
